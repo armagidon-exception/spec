@@ -22,6 +22,9 @@ A library for generating beautiful, commented, type-safe YML through interfaces
 - **Fully customizable keys** 🗝️  
   Use `@Key` or `@SerializedName` to control config names precisely.
 
+- **Add new properties anytime** ➕
+  Evolve your specs without breaking existing configs — full backwards compatibility!
+
 - **Recursive specs support** ♻️  
   Nest specs inside arrays, lists, maps, or other specs — no limits!
 
