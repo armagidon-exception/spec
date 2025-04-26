@@ -54,6 +54,33 @@ A library for generating beautiful, commented, type-safe YML through interfaces
 - Handles nested, complex configs effortlessly
 - Tiny footprint
 
+## Usage
+
+#### Maven
+
+```xml
+<dependencies>
+    <!-- Required for all platforms -->
+    <dependency>
+        <groupId>io.github.revxrsal</groupId>
+        <artifactId>spec</artifactId>
+        <version>[VERSION]</version>
+    </dependency>
+</dependencies>
+```
+
+Latest version: ![](https://img.shields.io/maven-metadata/v/https/repo1.maven.org/maven2/io/github/revxrsal/spec/maven-metadata.xml.svg?label=maven%20central\&colorB=brightgreen)
+
+#### Gradle
+
+```groovy
+dependencies {
+    implementation("io.github.revxrsal:spec:[VERSION]")
+}
+```
+
+Latest version: ![](https://img.shields.io/maven-metadata/v/https/repo1.maven.org/maven2/io/github/revxrsal/spec/maven-metadata.xml.svg?label=maven%20central\&colorB=brightgreen)
+
 ### Example
 
 ```java
