@@ -8,55 +8,109 @@
 
 A library for generating beautiful, commented, type-safe YML through interfaces
 
-### Features
-- Create interfaces that define your configuration
-- Create default values with default methods
-- Supports comments for specs using `@Comment` 🔥
-- Recursively use specs as arrays, lists, values of maps, etc.
-- Specs support setters
-- Self-reloading and self-saving 🔥
-- Uses Gson under the hood for serializing and deserializing, so you can add 
+## 🚀 Features
+
+- **Define your configs with clean interfaces** 🎨  
+  Just write an interface — no messy boilerplate!
+
+- **Default values? Easy.** ✍️  
+  Simply use default methods to provide fallback values.
+
+- **Built-in comments with `@Comment`** 💬  
+  Generate beautiful, documented configuration files automatically.
+
+- **Fully customizable keys** 🗝️  
+  Use `@Key` or `@SerializedName` to control config names precisely.
+
+- **Recursive specs support** ♻️  
+  Nest specs inside arrays, lists, maps, or other specs — no limits!
+
+- **Powerful setters support** 🛠️  
+  Update values programmatically at runtime without effort.
+
+- **Self-saving and self-reloading** 🔥  
+  Call `save()` or `reload()` right from your spec — it's automatic!
+
+- **Map access made simple** 🗺️  
+  Get live `Map` views of your specs. Changes to the map = changes to the object.
+
+- **Custom `@AsMap` support** 📜  
+  Define your own methods to expose a `Map<String, Object>` view of the spec.
+
+- **Instant resets with `@Reset`** 🔄  
+  Roll back any spec instance to its default state in a single call.
+
+- **Powered by Gson** ⚡  
+  Use all Gson features: custom type adapters, fine-tuned serialization, and more.
+
+- **Ultra lightweight** 🧹  
+  Only **40 KB** in size — no bloat, no slowdown.
+
+## ✨ Why you'll love it:
+- Super clean APIs
+- Zero learning curve
+- Infinite flexibility with Gson
+- Handles nested, complex configs effortlessly
+- Blazing fast and tiny footprint
 
 ### Example
 
 ```java
 @ConfigSpec(header = {
-        "Welcome to my retro encabulator configuration",
-        " ",
-        "This configuration allows you to use six hydrocoptic marzel vanes and",
-        "an ambifacient lunar wane shaft to prevent unwanted side fumbling.",
-        " ",
-        "[Insert more unintelligible tech jargon here]"
+        "========================================",
+        "          Server Configuration          ",
+        "========================================",
+        "This file controls basic server settings.",
+        "Edit with care to avoid misconfiguration."
 })
-public interface MyConfiguration {
+public interface ServerConfig {
 
-    @Key("device-name") // <--- optional
-    @Comment("The device name")
-    default String name() {
-        return "Default name";
+    @Key("name") // <--- optional
+    @Comment("The name that will be displayed to players.")
+    default String serverName() {
+        return "My Awesome Server";
     }
 
-    @Comment("The arena capacity")
-    int capacity();
+    @Key("max-players")
+    @Comment("Maximum number of players allowed online at once.")
+    default int maxPlayers() {
+        return 100;
+    }
 
+    @Key("game-mode")
     @Comment({
-            "The arena type. Values: 'teams' or 'single'",
+            "Server operating mode:",
+            "- SURVIVAL = Normal gameplay",
+            "- CREATIVE = Build freely",
+            "- ADVENTURE = Limited interactions",
             " ",
-            "Default value: teams"
+            "Default: SURVIVAL"
     })
-    default ArenaType type() {
-        return ArenaType.SINGLE;
+    default Mode serverMode() {
+        return Mode.SURVIVAL;
     }
 
-    @Save // <--- Spec handles that! Don't worry
+    @Comment("The message shown in the multiplayer server list.")
+    default String motd() {
+        return "Welcome to the Adventure!";
+    }
+
+    @Key("whitelist-enabled")
+    @Comment("Enable/disable whitelist mode. Only approved players can join.")
+    default boolean whitelistEnabled() {
+        return false;
+    }
+
+    @Save
     void save();
-    
-    @Reload // <--- Spec handles that! Don't worry
+
+    @Reload
     void reload();
-    
-    enum ArenaType {
-        TEAMS,
-        SINGLE
+
+    enum Mode {
+        SURVIVAL,
+        CREATIVE,
+        ADVENTURE
     }
 }
 ```
@@ -65,7 +119,7 @@ public interface MyConfiguration {
 import java.nio.file.Paths;
 
 public static void main(String[] args) {
-    MyConfiguration config = Specs.fromFile(MyConfiguration.class, Paths.get("config.yml"));
+    ServerConfig config = Specs.fromFile(ServerConfig.class, Paths.get("server.yml"));
     // The Specs class includes many more utilities. Check it out!
 
     // Saves the configuration to config.yml
@@ -80,21 +134,29 @@ public static void main(String[] args) {
 
 Output YML:
 ```yml
-# Welcome to my retro encabulator configuration
-#  
-# This configuration allows you to use six hydrocoptic marzel vanes and
-# an ambifacient lunar wane shaft to prevent unwanted side fumbling.
-#  
-# [Insert more unintelligible tech jargon here]
+# ========================================
+#           Server Configuration          
+# ========================================
+# This file controls basic server settings.
+# Edit with care to avoid misconfiguration.
 
-# The device name
-device-name: Default name
-
-# The arena type. Values: 'teams' or 'single'
+# Server operating mode:
+# - SURVIVAL = Normal gameplay
+# - CREATIVE = Build freely
+# - ADVENTURE = Limited interactions
 #  
-# Default value: teams
-type: SINGLE
+# Default: SURVIVAL
+game-mode: SURVIVAL
 
-# The arena capacity
-capacity: 0.0
+# The message shown in the multiplayer server list.
+motd: Welcome to the Adventure!
+
+# The name that will be displayed to players.
+name: My Awesome Server
+
+# Enable/disable whitelist mode. Only approved players can join.
+whitelist-enabled: false
+
+# Maximum number of players allowed online at once.
+max-players: 100.0
 ```
