@@ -49,7 +49,7 @@ A library for generating beautiful, commented, type-safe YML through interfaces
 - Zero learning curve
 - Infinite flexibility with Gson
 - Handles nested, complex configs effortlessly
-- Blazing fast and tiny footprint
+- Tiny footprint
 
 ### Example
 
