@@ -34,7 +34,7 @@ import java.util.NoSuchElementException;
 /**
  * A utility class with small helper functions
  */
-public final class Util {
+final class Util {
 
     private Util() {
     }
