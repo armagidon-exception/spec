@@ -54,6 +54,13 @@ import static java.util.regex.Pattern.LITERAL;
  */
 public class CommentedConfiguration {
 
+    private static final ThreadLocal<Yaml> YAML = ThreadLocal.withInitial(() -> {
+        DumperOptions options = new DumperOptions();
+        setProcessComments(options, false);
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        return new Yaml(options);
+    });
+
     public static final Gson GSON = new GsonBuilder()
             .registerTypeAdapterFactory(SpecAdapterFactory.INSTANCE)
             .create();
@@ -101,20 +108,14 @@ public class CommentedConfiguration {
     protected final ArrayCommentStyle arrayCommentStyle;
 
     public CommentedConfiguration(Path file, Gson gson, ArrayCommentStyle arrayCommentStyle, Yaml yaml) {
-        this.gson = gson;
         this.file = file;
+        this.gson = gson;
         this.arrayCommentStyle = arrayCommentStyle;
         this.yaml = yaml;
     }
 
     public CommentedConfiguration(Path file, Gson gson, ArrayCommentStyle arrayCommentStyle) {
-        this.gson = gson;
-        this.file = file;
-        this.arrayCommentStyle = arrayCommentStyle;
-        DumperOptions options = new DumperOptions();
-        setProcessComments(options, false);
-        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-        this.yaml = new Yaml(options);
+        this(file, gson, arrayCommentStyle, YAML.get());
     }
 
     /**
