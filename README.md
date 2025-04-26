@@ -31,9 +31,6 @@ A library for generating beautiful, commented, type-safe YML through interfaces
 - **Self-saving and self-reloading** 🔥  
   Call `save()` or `reload()` right from your spec — it's automatic!
 
-- **Map access made simple** 🗺️  
-  Get live `Map` views of your specs. Changes to the map = changes to the object.
-
 - **Custom `@AsMap` support** 📜  
   Define your own methods to expose a `Map<String, Object>` view of the spec.
 
@@ -47,6 +44,7 @@ A library for generating beautiful, commented, type-safe YML through interfaces
   Only **40 KB** in size — no bloat, no slowdown.
 
 ## ✨ Why you'll love it:
+
 - Super clean APIs
 - Zero learning curve
 - Infinite flexibility with Gson
@@ -56,6 +54,7 @@ A library for generating beautiful, commented, type-safe YML through interfaces
 ### Example
 
 ```java
+
 @ConfigSpec(header = {
         "========================================",
         "          Server Configuration          ",
@@ -133,6 +132,7 @@ public static void main(String[] args) {
 ```
 
 Output YML:
+
 ```yml
 # ========================================
 #           Server Configuration          
