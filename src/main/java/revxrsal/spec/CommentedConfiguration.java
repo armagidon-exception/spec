@@ -189,6 +189,8 @@ public class CommentedConfiguration {
         if (!headers.isEmpty()) {
             lines.add(headers.size(), "");
         }
+        if (file.getParent() != null)
+            Files.createDirectories(file.getParent());
         Files.write(file, lines, CREATE, TRUNCATE_EXISTING, WRITE);
     }
 
