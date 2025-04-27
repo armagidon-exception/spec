@@ -69,7 +69,7 @@ final class MHLookup {
     @SneakyThrows
     public static @NotNull Lookup privateLookupIn(Class<?> cl) {
         if (privateLookupIn != null) {
-            return (Lookup) privateLookupIn.invoke(cl, lookup());
+            return (Lookup) privateLookupIn.invoke(null, cl, lookup());
         }
         if (constructor != null) {
             return constructor.newInstance(cl);
