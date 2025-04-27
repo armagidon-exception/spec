@@ -46,7 +46,7 @@ final class MapProxy<T> implements InvocationHandler {
     @SuppressWarnings("unchecked")
     public static @NotNull <T> T generate(@NotNull Class<T> type, @NotNull Map<String, Object> map) {
         return (T) Proxy.newProxyInstance(
-                MapProxy.class.getClassLoader(),
+                type.getClassLoader(),
                 new Class[]{type},
                 new MapProxy<>(type, map)
         );
