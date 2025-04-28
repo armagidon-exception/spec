@@ -57,11 +57,17 @@ final class MapProxy<T> implements InvocationHandler {
     static @NotNull <T> Map<String, Object> getInternalMap(T value) {
         Objects.requireNonNull(value, "value is null!");
         if (!Proxy.isProxyClass(value.getClass())) {
-            throw new IllegalArgumentException("Not a proxy instance.");
+            for (Class<?> cInterface : value.getClass().getInterfaces()) {
+                if (isConfigSpec(cInterface))
+                    throw new IllegalArgumentException("Don't try to create an instance of a ConfigSpec directly! " +
+                            "Use Specs.createDefault() or Specs.createUnsafe() instead. " +
+                            "Tried to create an instance of " + cInterface + ".");
+            }
+            throw new IllegalArgumentException("Not a proxy instance: " + value);
         }
         InvocationHandler handler = Proxy.getInvocationHandler(value);
         if (!(handler instanceof MapProxy)) {
-            throw new IllegalArgumentException("Not a config spec");
+            throw new IllegalArgumentException("Not a config spec: " + value + " (proxy is handled by " + handler + ")");
         }
         return ((MapProxy<T>) handler).map;
     }
