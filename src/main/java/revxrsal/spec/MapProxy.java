@@ -23,6 +23,7 @@
  */
 package revxrsal.spec;
 
+import lombok.SneakyThrows;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import revxrsal.spec.annotation.*;
@@ -32,6 +33,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static revxrsal.spec.SpecProperty.impliesSetter;
 import static revxrsal.spec.SpecProperty.keyOf;
@@ -79,7 +81,8 @@ final class MapProxy<T> implements InvocationHandler {
     private final Class<T> type;
     private final Map<String, Object> map;
 
-    private final Map<Method, MethodHandle> defaultMethodHandles = new HashMap<>();
+    private Map<Method, MethodHandle> defaultMethodHandles;
+    private Map<Method, Object> memoized;
 
     public MapProxy(Class<T> type, Map<String, Object> map) {
         this.type = type;
@@ -105,14 +108,19 @@ final class MapProxy<T> implements InvocationHandler {
             return map.hashCode();
         }
         if (method.isAnnotationPresent(IgnoreMethod.class)) {
-            MethodHandle mh = defaultMethodHandles.get(method);
-            if (mh == null) {
-                mh = MHLookup.privateLookupIn(type)
-                        .in(type)
-                        .unreflectSpecial(method, type);
-                defaultMethodHandles.put(method, mh);
-            }
-            return mh.bindTo(proxy).invokeWithArguments(args);
+            return asMethodHandle(method).bindTo(proxy).invokeWithArguments(args);
+        }
+        if (method.isAnnotationPresent(Memoize.class)) {
+            if (memoized == null)
+                memoized = new ConcurrentHashMap<>();
+            return memoized.computeIfAbsent(method, m -> {
+                try {
+                    return asMethodHandle(m).bindTo(proxy).invokeWithArguments(args);
+                } catch (Throwable e) {
+                    sneakyThrow(e);
+                    return null;
+                }
+            });
         }
         if (method.isAnnotationPresent(AsMap.class)) {
             AsMap asMap = method.getAnnotation(AsMap.class);
@@ -133,6 +141,8 @@ final class MapProxy<T> implements InvocationHandler {
         }
         if (method.isAnnotationPresent(Reset.class)) {
             this.map.clear();
+            if (memoized != null)
+                memoized.clear();
             //noinspection unchecked
             createDefaultMap(type, (T) proxy, this.map);
             return null;
@@ -140,10 +150,26 @@ final class MapProxy<T> implements InvocationHandler {
         String key = keyOf(method);
         if (method.getReturnType() == Void.TYPE || impliesSetter(method)) {
             map.put(key, args[0]);
+            if (memoized != null)
+                memoized.clear();
             return null;
         } else {
             return map.get(key);
         }
+    }
+
+    @SneakyThrows
+    private MethodHandle asMethodHandle(Method m) {
+        if (defaultMethodHandles == null)
+            defaultMethodHandles = new HashMap<>();
+        MethodHandle mh = defaultMethodHandles.get(m);
+        if (mh == null) {
+            mh = MHLookup.privateLookupIn(type)
+                    .in(type)
+                    .unreflectSpecial(m, type);
+            defaultMethodHandles.put(m, mh);
+        }
+        return mh;
     }
 
     private String generateToString() {
@@ -170,5 +196,16 @@ final class MapProxy<T> implements InvocationHandler {
         } catch (NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static RuntimeException sneakyThrow(Throwable t) {
+        if (t == null) throw new NullPointerException("t");
+        return sneakyThrow0(t);
+    }
+
+    @SuppressWarnings("unchecked")
+    @SneakyThrows
+    private static <T extends Throwable> T sneakyThrow0(Throwable t) throws T {
+        throw (T) t;
     }
 }
