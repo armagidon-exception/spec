@@ -26,27 +26,44 @@ package revxrsal.spec;
 import com.google.gson.Gson;
 import com.google.gson.TypeAdapter;
 import com.google.gson.TypeAdapterFactory;
+import com.google.gson.annotations.JsonAdapter;
+import com.google.gson.internal.ConstructorConstructor;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static revxrsal.spec.MHLookup.privateLookupIn;
 import static revxrsal.spec.Specs.createDefault;
 import static revxrsal.spec.Specs.isConfigSpec;
 
-@SuppressWarnings({"unchecked", "rawtypes"})
+@SuppressWarnings({"unchecked"})
 public final class SpecAdapterFactory implements TypeAdapterFactory {
+
+    private static @Nullable MethodHandle CTR_CTR = null;
+
+    static {
+        try {
+            MethodHandles.Lookup lookup = privateLookupIn(Gson.class);
+            CTR_CTR = lookup
+                    .findGetter(Gson.class, "constructorConstructor", ConstructorConstructor.class);
+        } catch (Throwable ignored) {
+        }
+    }
 
     public static final SpecAdapterFactory INSTANCE = new SpecAdapterFactory();
 
-    @SneakyThrows
     @Override
+    @SneakyThrows
     public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
         Class<?> rawType = type.getRawType();
         if (!isConfigSpec(rawType)) {
@@ -59,7 +76,17 @@ public final class SpecAdapterFactory implements TypeAdapterFactory {
                 continue;
             Method getter = value.getter();
             TypeToken<?> fieldType = TypeToken.get(getter.getGenericReturnType());
-            TypeAdapter<Object> adapter = (TypeAdapter) gson.getAdapter(fieldType);
+
+            TypeAdapter<?> adapter = null;
+            JsonAdapter annotation = getter.getAnnotation(JsonAdapter.class);
+            if (CTR_CTR != null) {
+                ConstructorConstructor constructorConstructor = (ConstructorConstructor) CTR_CTR.invoke(gson);
+                if (annotation != null) {
+                    adapter = getTypeAdapter(constructorConstructor, gson, fieldType, annotation);
+                }
+            }
+            if (adapter == null)
+                adapter = gson.getAdapter(fieldType);
 
             BoundField field = new BoundField(value.key(), adapter);
             fieldsMap.put(value.key(), field);
@@ -73,7 +100,7 @@ public final class SpecAdapterFactory implements TypeAdapterFactory {
                 for (BoundField boundField : fieldsMap.values()) {
                     out.name(boundField.name);
                     Object fieldValue = map.get(boundField.name);
-                    boundField.adapter.write(out, fieldValue);
+                    boundField.adapter().write(out, fieldValue);
                 }
                 out.endObject();
             }
@@ -100,15 +127,35 @@ public final class SpecAdapterFactory implements TypeAdapterFactory {
         };
     }
 
-
     private static class BoundField {
         private final @NotNull String name;
-        private final @NotNull TypeAdapter<Object> adapter;
+        private final @NotNull TypeAdapter<?> adapter;
 
         @SneakyThrows
-        public BoundField(@NotNull String name, @NotNull TypeAdapter<Object> adapter) {
+        public BoundField(@NotNull String name, @NotNull TypeAdapter<?> adapter) {
             this.name = name;
             this.adapter = adapter;
         }
+
+        public @NotNull <T> TypeAdapter<T> adapter() {
+            return (TypeAdapter<T>) adapter;
+        }
+    }
+
+    static TypeAdapter<?> getTypeAdapter(ConstructorConstructor constructorConstructor, Gson gson,
+                                         TypeToken<?> fieldType, JsonAdapter annotation) {
+        Class<?> value = annotation.value();
+        if (TypeAdapter.class.isAssignableFrom(value)) {
+            Class<TypeAdapter<?>> typeAdapter = (Class<TypeAdapter<?>>) value;
+            return constructorConstructor.get(TypeToken.get(typeAdapter)).construct();
+        }
+        if (TypeAdapterFactory.class.isAssignableFrom(value)) {
+            Class<TypeAdapterFactory> typeAdapterFactory = (Class<TypeAdapterFactory>) value;
+            return constructorConstructor.get(TypeToken.get(typeAdapterFactory))
+                    .construct()
+                    .create(gson, fieldType);
+        }
+
+        throw new IllegalArgumentException("@JsonAdapter value must be TypeAdapter or TypeAdapterFactory reference.");
     }
 }
