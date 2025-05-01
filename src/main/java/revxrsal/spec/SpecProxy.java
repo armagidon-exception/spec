@@ -23,14 +23,17 @@
  */
 package revxrsal.spec;
 
+import lombok.RequiredArgsConstructor;
 import revxrsal.spec.annotation.Reload;
 import revxrsal.spec.annotation.Save;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.function.Supplier;
 
+@RequiredArgsConstructor
 final class SpecProxy<T> implements InvocationHandler {
 
     public static <T> T proxy(Class<T> type, Supplier<T> supplier, Runnable onReload, Runnable onSave) {
@@ -38,28 +41,41 @@ final class SpecProxy<T> implements InvocationHandler {
         return (T) Proxy.newProxyInstance(
                 type.getClassLoader(),
                 new Class<?>[]{type},
-                new SpecProxy<>(supplier, onReload, onSave)
+                new SpecProxy<>(type, supplier, onReload, onSave)
         );
     }
 
+    private final Class<?> type;
     private final Supplier<T> supplier;
     private final Runnable onReload;
     private final Runnable onSave;
 
-    public SpecProxy(Supplier<T> supplier, Runnable onReload, Runnable onSave) {
-        this.supplier = supplier;
-        this.onReload = onReload;
-        this.onSave = onSave;
-    }
+    private MethodHandle reloadDef, saveDef;
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         if (method.isAnnotationPresent(Reload.class)) {
             onReload.run();
+            if (method.isDefault()) {
+                if (reloadDef == null) {
+                    reloadDef = MHLookup.privateLookupIn(type)
+                            .in(type)
+                            .unreflectSpecial(method, type);
+                }
+                return reloadDef.bindTo(proxy).invokeWithArguments(args);
+            }
             return null;
         }
         if (method.isAnnotationPresent(Save.class)) {
             onSave.run();
+            if (method.isDefault()) {
+                if (saveDef == null) {
+                    saveDef = MHLookup.privateLookupIn(type)
+                            .in(type)
+                            .unreflectSpecial(method, type);
+                }
+                return saveDef.bindTo(proxy).invokeWithArguments(args);
+            }
             return null;
         }
         T instance = supplier.get();
