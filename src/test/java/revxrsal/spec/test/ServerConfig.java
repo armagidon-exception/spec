@@ -57,7 +57,7 @@ public interface ServerConfig {
     // Your function can have any arguments as needed
     @Reload
     default void reload() {
-        System.out.println("Plugin reloaded!");
+        System.out.println("Configuration reloaded!");
     }
 
     // We can nest ConfigSpecs too!
