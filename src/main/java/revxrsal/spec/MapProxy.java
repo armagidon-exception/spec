@@ -47,11 +47,7 @@ final class MapProxy<T> implements InvocationHandler {
 
     @SuppressWarnings("unchecked")
     public static @NotNull <T> T generate(@NotNull Class<T> type, @NotNull Map<String, Object> map) {
-        return (T) Proxy.newProxyInstance(
-                type.getClassLoader(),
-                new Class[]{type},
-                new MapProxy<>(type, map)
-        );
+        return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class[]{type}, new MapProxy<>(type, map));
     }
 
     @SuppressWarnings({"unchecked"})
@@ -61,9 +57,7 @@ final class MapProxy<T> implements InvocationHandler {
         if (!Proxy.isProxyClass(value.getClass())) {
             for (Class<?> cInterface : value.getClass().getInterfaces()) {
                 if (isConfigSpec(cInterface))
-                    throw new IllegalArgumentException("Don't try to create an instance of a ConfigSpec directly! " +
-                            "Use Specs.createDefault() or Specs.createUnsafe() instead. " +
-                            "Tried to create an instance of " + cInterface + ".");
+                    throw new IllegalArgumentException("Don't try to create an instance of a ConfigSpec directly! " + "Use Specs.createDefault() or Specs.createUnsafe() instead. " + "Tried to create an instance of " + cInterface + ".");
             }
             throw new IllegalArgumentException("Not a proxy instance: " + value);
         }
@@ -111,8 +105,9 @@ final class MapProxy<T> implements InvocationHandler {
             return asMethodHandle(method).bindTo(proxy).invokeWithArguments(args);
         }
         if (method.isAnnotationPresent(Memoize.class)) {
-            if (memoized == null)
-                memoized = new ConcurrentHashMap<>();
+            if (!method.isDefault())
+                throw new IllegalArgumentException("@Memoize methods must be default!");
+            if (memoized == null) memoized = new ConcurrentHashMap<>();
             return memoized.computeIfAbsent(method, m -> {
                 try {
                     return asMethodHandle(m).bindTo(proxy).invokeWithArguments(args);
@@ -141,8 +136,7 @@ final class MapProxy<T> implements InvocationHandler {
         }
         if (method.isAnnotationPresent(Reset.class)) {
             this.map.clear();
-            if (memoized != null)
-                memoized.clear();
+            if (memoized != null) memoized.clear();
             //noinspection unchecked
             createDefaultMap(type, (T) proxy, this.map);
             return null;
@@ -150,8 +144,7 @@ final class MapProxy<T> implements InvocationHandler {
         String key = keyOf(method);
         if (method.getReturnType() == Void.TYPE || impliesSetter(method)) {
             map.put(key, args[0]);
-            if (memoized != null)
-                memoized.clear();
+            if (memoized != null) memoized.clear();
             return null;
         } else {
             return map.get(key);
@@ -160,13 +153,10 @@ final class MapProxy<T> implements InvocationHandler {
 
     @SneakyThrows
     private MethodHandle asMethodHandle(Method m) {
-        if (defaultMethodHandles == null)
-            defaultMethodHandles = new HashMap<>();
+        if (defaultMethodHandles == null) defaultMethodHandles = new HashMap<>();
         MethodHandle mh = defaultMethodHandles.get(m);
         if (mh == null) {
-            mh = MHLookup.privateLookupIn(type)
-                    .in(type)
-                    .unreflectSpecial(m, type);
+            mh = MHLookup.privateLookupIn(type).in(type).unreflectSpecial(m, type);
             defaultMethodHandles.put(m, mh);
         }
         return mh;
