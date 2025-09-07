@@ -1,4 +1,4 @@
-package revxrsal.spec;
+package revxrsal.spec.annotation;
 
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonSerializer;

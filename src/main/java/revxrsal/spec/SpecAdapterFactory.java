@@ -44,6 +44,7 @@ import java.util.Map;
 import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import revxrsal.spec.annotation.UseTypeAdapter;
 
 @SuppressWarnings({"unchecked"})
 public final class SpecAdapterFactory implements TypeAdapterFactory {
