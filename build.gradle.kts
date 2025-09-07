@@ -13,16 +13,18 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.google.code.gson:gson:2.3.1")
-    compileOnly("org.yaml:snakeyaml:1.15")
+    compileOnly("com.google.code.gson:gson:2.8.9")
+    compileOnly("org.yaml:snakeyaml:2.0")
     compileOnly("org.jetbrains:annotations:24.1.0")
     compileOnly("org.projectlombok:lombok:1.18.32")
     annotationProcessor("org.projectlombok:lombok:1.18.32")
 
-    testImplementation("com.google.code.gson:gson:2.3.1")
-    testImplementation("org.yaml:snakeyaml:1.15")
+    testImplementation("com.google.code.gson:gson:2.8.9")
+    testImplementation("org.yaml:snakeyaml:2.0")
     testCompileOnly("org.projectlombok:lombok:1.18.32")
     testCompileOnly("org.jetbrains:annotations:24.1.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.7.1")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testAnnotationProcessor("org.projectlombok:lombok:1.18.32")
 }
 
@@ -30,6 +32,10 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(8))
     }
+}
+
+tasks.named<Test>("test") {
+    useJUnitPlatform()
 }
 
 mavenPublishing {
