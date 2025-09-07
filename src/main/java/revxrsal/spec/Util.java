@@ -23,6 +23,10 @@
  */
 package revxrsal.spec;
 
+import com.google.gson.stream.JsonReader;
+import java.util.ArrayList;
+import java.util.List;
+import lombok.SneakyThrows;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -199,4 +203,84 @@ final class Util {
             return new PeekingIterator<>(iterator);
         }
     }
+
+  /**
+   * All things related to calculating paths of json parsers
+   */
+  public static final class JsonPathUtils {
+
+    private static final Field stackF;
+    private static final Field stackSizeF;
+    private static final Field pathIndicesF;
+    private static final Field pathNameF;
+
+    static {
+      try {
+        stackF = JsonReader.class.getDeclaredField("stack");
+        stackF.setAccessible(true);
+        stackSizeF = JsonReader.class.getDeclaredField("stackSize");
+        stackSizeF.setAccessible(true);
+        pathIndicesF = JsonReader.class.getDeclaredField("pathIndices");
+        pathIndicesF.setAccessible(true);
+        pathNameF = JsonReader.class.getDeclaredField("pathNames");
+        pathNameF.setAccessible(true);
+      } catch (NoSuchFieldException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    /**
+    * Copypasta from Gson's JsonScope.
+    * */
+    private static final class JsonScope {
+      static final int EMPTY_ARRAY = 1;
+      static final int NONEMPTY_ARRAY = 2;
+      static final int EMPTY_OBJECT = 3;
+      static final int DANGLING_NAME = 4;
+      static final int NONEMPTY_OBJECT = 5;
+      static final int EMPTY_DOCUMENT = 6;
+      static final int NONEMPTY_DOCUMENT = 7;
+      static final int CLOSED = 8;
+    }
+
+    /**
+     * Calculates current path of json reader as a list of nodes
+     * Resulting list will look like the following [object1, object2, 1, value1].
+     * Values of this list are strings inside objects and integers inside arrays
+     * @param reader {@link JsonReader} that is being used
+     * @return list of nodes that is path of the reader
+     */
+
+    @SneakyThrows
+    public static List<Object> getJsonPath(JsonReader reader) {
+      int[] stack = (int[]) stackF.get(reader);
+      int stackSize = (int) stackSizeF.get(reader);
+      String[] pathNames = (String[]) pathNameF.get(reader);
+      int[] pathIndices = (int[]) pathIndicesF.get(reader);
+
+      List<Object> path = new ArrayList<>();
+      for (int i = 0; i < stackSize; i++) {
+        switch (stack[i]) {
+          case JsonScope.EMPTY_ARRAY:
+          case JsonScope.NONEMPTY_ARRAY:
+            path.add(pathIndices[i]);
+            break;
+
+          case JsonScope.EMPTY_OBJECT:
+          case JsonScope.DANGLING_NAME:
+          case JsonScope.NONEMPTY_OBJECT:
+            if (pathNames[i] != null) {
+              path.add(pathNames[i]);
+            }
+            break;
+
+          case JsonScope.NONEMPTY_DOCUMENT:
+          case JsonScope.EMPTY_DOCUMENT:
+          case JsonScope.CLOSED:
+            break;
+        }
+      }
+      return path;
+    }
+  }
 }

@@ -128,7 +128,7 @@ public class CommentedConfiguration {
             return;
         }
         try (BufferedReader reader = Files.newBufferedReader(file)) {
-            data = (Map<String, Object>) yaml.load(reader);
+            data = yaml.load(reader);
             if (data == null)
                 data = new LinkedHashMap<>();
         }
