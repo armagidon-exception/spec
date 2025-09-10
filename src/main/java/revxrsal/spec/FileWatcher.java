@@ -43,14 +43,14 @@ public class FileWatcher implements AutoCloseable {
         public Thread newThread(@NotNull Runnable r) {
             Thread t = new Thread(r);
             t.setDaemon(true);
-            t.setName("FileWatcher-Thread-" + counter.get());
+            t.setName("FileWatcher-Thread-" + counter.getAndIncrement());
             return t;
         }
     };
 
     private final Executor taskExecutor;
 
-    private final AtomicBoolean open = new AtomicBoolean(false);
+    private final AtomicBoolean open = new AtomicBoolean(true);
     private final WatchService watchService;
     private final Thread executor;
     private final Map<Path, Registration> registrations = new ConcurrentHashMap<>();
@@ -88,7 +88,7 @@ public class FileWatcher implements AutoCloseable {
                         }
 
                         registration.handle(event);
-                        if (registration.hasSubscribers()) {
+                        if (!registration.hasSubscribers()) {
                             key.cancel();
                             break;
                         }
