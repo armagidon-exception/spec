@@ -71,7 +71,6 @@ public final class SpecReference<T> {
         this.type = type;
         this.config = config;
         this.proxy = SpecProxy.proxy(type, this::value, this::reload, this::save);
-        reload();
     }
 
     /**

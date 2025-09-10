@@ -74,6 +74,7 @@ public final class Specs {
         if (!isConfigSpec(type)) {
             throw new IllegalArgumentException(type + " must be a spec class!");
         }
+
         return new SpecReference<>(type, config);
     }
 
@@ -87,7 +88,9 @@ public final class Specs {
      */
     public static @NotNull <T> T fromConfig(@NotNull Class<T> type,
         @NotNull CommentedConfiguration config) {
-        return reference(type, config).get();
+        var ref = reference(type, config);
+        ref.reload();
+        return ref.get();
     }
 
     /**
@@ -99,7 +102,10 @@ public final class Specs {
      * @return The newly created config spec.
      */
     public static @NotNull <T> T fromFile(@NotNull Class<T> type, @NotNull Path config) {
-        return reference(type, CommentedConfiguration.from(DataSocket.fromPath(config))).get();
+        var ref = reference(type, CommentedConfiguration.from(DataSocket.fromPath(config)));
+        ref.reload();
+
+        return ref.get();
     }
 
     /**
@@ -111,8 +117,7 @@ public final class Specs {
      * @return The newly created config spec.
      */
     public static @NotNull <T> T fromFile(@NotNull Class<T> type, @NotNull File config) {
-        return reference(type,
-            CommentedConfiguration.from(DataSocket.fromPath(config.toPath()))).get();
+        return fromFile(type, config.toPath());
     }
 
 
@@ -139,6 +144,17 @@ public final class Specs {
     }
 
 
+    /**
+     * Generates a config spec from the specified file and subscribes it to
+     * updates of config file.
+     *
+     * @param type The interface type
+     * @param path The config file
+     * @param fileWatcher FileWatcher that will reload config
+     * @return The newly created config spec.
+     * @param <T> The type
+     * @throws IOException if fileWatcher fails to subscribe to file updates
+     */
     public static @NotNull <T> T setupHotReloading(@NotNull Class<T> type,
         @NotNull File path, FileWatcher fileWatcher) throws IOException {
         return setupHotReloading(type, path.toPath(), fileWatcher);
