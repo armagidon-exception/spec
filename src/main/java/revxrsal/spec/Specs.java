@@ -23,17 +23,27 @@
  */
 package revxrsal.spec;
 
-import lombok.SneakyThrows;
-import org.jetbrains.annotations.NotNull;
-import revxrsal.spec.annotation.ConfigSpec;
-
 import java.io.File;
+import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.file.Path;
-import java.util.*;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent.Kind;
+import java.nio.file.WatchKey;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.SneakyThrows;
+import org.jetbrains.annotations.NotNull;
+import revxrsal.spec.annotation.ConfigSpec;
 
 public final class Specs {
 
@@ -54,35 +64,38 @@ public final class Specs {
      * <p>
      * A reference offers a flexible wrapper around the config spec value.
      *
-     * @param type   The interface type
+     * @param type The interface type
      * @param config The config file
-     * @param <T>    The type
+     * @param <T> The type
      * @return The newly created {@link SpecReference}.
      */
-    public static @NotNull <T> SpecReference<T> reference(@NotNull Class<T> type, @NotNull CommentedConfiguration config) {
-        if (!isConfigSpec(type))
+    public static @NotNull <T> SpecReference<T> reference(@NotNull Class<T> type,
+        @NotNull CommentedConfiguration config) {
+        if (!isConfigSpec(type)) {
             throw new IllegalArgumentException(type + " must be a spec class!");
+        }
         return new SpecReference<>(type, config);
     }
 
     /**
      * Generates a config spec from the specified config.
      *
-     * @param type   The interface type
+     * @param type The interface type
      * @param config The config file
-     * @param <T>    The type
+     * @param <T> The type
      * @return The newly created config spec.
      */
-    public static @NotNull <T> T fromConfig(@NotNull Class<T> type, @NotNull CommentedConfiguration config) {
+    public static @NotNull <T> T fromConfig(@NotNull Class<T> type,
+        @NotNull CommentedConfiguration config) {
         return reference(type, config).get();
     }
 
     /**
      * Generates a config spec from the specified file.
      *
-     * @param type   The interface type
+     * @param type The interface type
      * @param config The config file
-     * @param <T>    The type
+     * @param <T> The type
      * @return The newly created config spec.
      */
     public static @NotNull <T> T fromFile(@NotNull Class<T> type, @NotNull Path config) {
@@ -92,27 +105,58 @@ public final class Specs {
     /**
      * Generates a config spec from the specified file.
      *
-     * @param type   The interface type
+     * @param type The interface type
      * @param config The config file
-     * @param <T>    The type
+     * @param <T> The type
      * @return The newly created config spec.
      */
     public static @NotNull <T> T fromFile(@NotNull Class<T> type, @NotNull File config) {
-        return reference(type, CommentedConfiguration.from(DataSocket.fromPath(config.toPath()))).get();
+        return reference(type,
+            CommentedConfiguration.from(DataSocket.fromPath(config.toPath()))).get();
+    }
+
+
+    /**
+     * Generates a config spec from the specified file and subscribes it to
+     * updates of config file.
+     *
+     * @param type The interface type
+     * @param path The config file
+     * @param fileWatcher FileWatcher that will reload config
+     * @return The newly created config spec.
+     * @param <T> The type
+     * @throws IOException if fileWatcher fails to subscribe to file updates
+     */
+    public static @NotNull <T> T setupHotReloading(@NotNull Class<T> type,
+        @NotNull Path path, @NotNull FileWatcher fileWatcher) throws IOException {
+        var config = fromFile(type, path);
+        SpecProxy<T> proxy = (SpecProxy<T>) Proxy.getInvocationHandler(config);
+        fileWatcher.listenToFile(path, watchEvent -> {
+            proxy.getOnReload().run();
+        });
+
+        return config;
+    }
+
+
+    public static @NotNull <T> T setupHotReloading(@NotNull Class<T> type,
+        @NotNull File path, FileWatcher fileWatcher) throws IOException {
+        return setupHotReloading(type, path.toPath(), fileWatcher);
     }
 
     /**
-     * Loads or generates (if necessary) all the information needed for the
-     * given spec
+     * Loads or generates (if necessary) all the information needed for the given spec
      *
      * @param interfaceType The spec type
      * @return The generated {@link SpecClass}
      */
     public static @NotNull SpecClass from(@NotNull Class<?> interfaceType) {
-        if (!interfaceType.isInterface())
+        if (!interfaceType.isInterface()) {
             throw new IllegalArgumentException("Class is not an interface.");
-        if (!interfaceType.isAnnotationPresent(ConfigSpec.class))
+        }
+        if (!interfaceType.isAnnotationPresent(ConfigSpec.class)) {
             throw new IllegalArgumentException("Interface must have @ConfigSpec");
+        }
 
         return IMPLEMENTATIONS.computeIfAbsent(interfaceType, SpecClass::from);
     }
@@ -120,20 +164,21 @@ public final class Specs {
     /**
      * Creates a spec with the default values for the given spec type.
      * <p>
-     * If the spec contains other nested specs, they will be generated with their
-     * default values as well.
+     * If the spec contains other nested specs, they will be generated with their default values as
+     * well.
      * <p>
-     * Lists, maps, sets, arrays, and primitive types will be initialized to
-     * empty values. Everything else will be null.
+     * Lists, maps, sets, arrays, and primitive types will be initialized to empty values.
+     * Everything else will be null.
      *
      * @param interfaceType The spec interface
-     * @param <T>           The spec type
+     * @param <T> The spec type
      * @return The newly created instance.
      */
     @SneakyThrows
     public static @NotNull <T> T createDefault(@NotNull Class<T> interfaceType) {
-        if (!isConfigSpec(interfaceType))
+        if (!isConfigSpec(interfaceType)) {
             throw new IllegalArgumentException(interfaceType + " must be a spec class!");
+        }
         Map<String, Object> properties = new LinkedHashMap<>();
         T proxy = MapProxy.generate(interfaceType, properties);
         createDefaultMap(interfaceType, proxy, properties);
@@ -141,25 +186,24 @@ public final class Specs {
     }
 
     /**
-     * Creates a spec with the given values from the map. Note that this
-     * method does not respect default values, so it is the user's responsibility
-     * to guarantee those.
+     * Creates a spec with the given values from the map. Note that this method does not respect
+     * default values, so it is the user's responsibility to guarantee those.
      *
      * @param interfaceType The spec interface
-     * @param <T>           The spec type
+     * @param <T> The spec type
      * @return The newly created instance.
      */
     @SneakyThrows
     public static @NotNull <T> T createUnsafe(
-            @NotNull Class<T> interfaceType,
-            @NotNull Map<String, Object> properties
+        @NotNull Class<T> interfaceType,
+        @NotNull Map<String, Object> properties
     ) {
         return MapProxy.generate(interfaceType, properties);
     }
 
     /**
-     * Returns the internal map of the given spec. Modifying this map
-     * will immediately modify the spec, so be careful with it!
+     * Returns the internal map of the given spec. Modifying this map will immediately modify the
+     * spec, so be careful with it!
      *
      * @return The internal map
      */
@@ -168,16 +212,18 @@ public final class Specs {
     }
 
     @SneakyThrows
-    static <T> void createDefaultMap(@NotNull Class<T> interfaceType, T proxy, @NotNull Map<String, Object> properties) {
+    static <T> void createDefaultMap(@NotNull Class<T> interfaceType, T proxy,
+        @NotNull Map<String, Object> properties) {
         SpecClass specClass = from(interfaceType);
         for (SpecProperty value : specClass.properties().values()) {
-            if (value.isHandledByProxy())
+            if (value.isHandledByProxy()) {
                 continue;
+            }
             if (value.hasDefault()) {
                 Method getter = value.getter();
                 MethodHandle getterHandle = MHLookup.privateLookupIn(interfaceType)
-                        .in(interfaceType)
-                        .unreflectSpecial(getter, interfaceType);
+                    .in(interfaceType)
+                    .unreflectSpecial(getter, interfaceType);
                 properties.put(value.key(), getterHandle.invoke(proxy));
             } else {
                 Class<?> type = value.type();
@@ -185,8 +231,8 @@ public final class Specs {
                     Object v = createDefault(type);
                     properties.put(value.key(), v);
                 } else if (type == List.class
-                        || type == Iterable.class
-                        || type == Collection.class
+                    || type == Iterable.class
+                    || type == Collection.class
                 ) {
                     properties.put(value.key(), new ArrayList<>());
                 } else if (type == Set.class) {

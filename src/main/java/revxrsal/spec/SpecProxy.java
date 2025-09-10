@@ -23,6 +23,7 @@
  */
 package revxrsal.spec;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import revxrsal.spec.annotation.Reload;
 import revxrsal.spec.annotation.Save;
@@ -33,6 +34,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.function.Supplier;
 
+@Getter
 @RequiredArgsConstructor
 final class SpecProxy<T> implements InvocationHandler {
 
