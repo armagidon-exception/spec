@@ -18,6 +18,7 @@ public interface ServerConfig {
     }
 
     @Key("max-players")
+    @Range(max = 100, min = 1)
     @Comment("Maximum number of players allowed online at once.")
     default int maxPlayers() {
         return 100;

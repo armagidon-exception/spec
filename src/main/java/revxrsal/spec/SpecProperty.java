@@ -24,6 +24,8 @@
 package revxrsal.spec;
 
 import com.google.gson.annotations.SerializedName;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -79,6 +81,20 @@ public final class SpecProperty {
      */
     @Getter
     private boolean isHandledByProxy;
+
+    /**
+     * Hooks that work on value read of this property.
+     * Could be used to implement data validators.
+     */
+    @Getter
+    private final List<Consumer<Object>> readHook = new CopyOnWriteArrayList<>();
+
+    /**
+     * Hooks that work on value write of this property.
+     * Could be used to implement data validators.
+     */
+    @Getter
+    private final List<Consumer<Object>> writeHook = new CopyOnWriteArrayList<>();
 
     /**
      * The key of the property, set by {@link Key @Key} or {@link SerializedName @SerializedName}.

@@ -49,153 +49,157 @@ import revxrsal.spec.annotation.UseTypeAdapter;
 @SuppressWarnings({"unchecked"})
 public final class SpecAdapterFactory implements TypeAdapterFactory {
 
-  public static final SpecAdapterFactory INSTANCE = new SpecAdapterFactory();
-  private static final @Nullable MethodHandle CTR_CTR;
+    public static final SpecAdapterFactory INSTANCE = new SpecAdapterFactory();
+    private static final @Nullable MethodHandle CTR_CTR;
 
-  static {
-    try {
-      MethodHandles.Lookup lookup = privateLookupIn(Gson.class);
-      CTR_CTR = lookup
-          .findGetter(Gson.class, "constructorConstructor", ConstructorConstructor.class);
-    } catch (Throwable t) {
-      // This is used to implement a key feature, it's bad to ignore if this field does not exist
-      // Some message to the user would probably be better,but for now it's fine
-      throw new RuntimeException(t);
-    }
-  }
-
-  @Override
-  @SneakyThrows
-  public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
-    Class<?> rawType = type.getRawType();
-    if (!isConfigSpec(rawType)) {
-      return null;
-    }
-    SpecClass impl = Specs.from(rawType);
-    Map<String, BoundField> fieldsMap = new LinkedHashMap<>();
-    for (SpecProperty value : impl.properties().values()) {
-      if (value.isHandledByProxy()) {
-        continue;
-      }
-      Method getter = value.getter();
-      TypeToken<?> fieldType = TypeToken.get(getter.getGenericReturnType());
-
-      TypeAdapter<?> adapter = null;
-      UseTypeAdapter annotation = getter.getAnnotation(UseTypeAdapter.class);
-      if (CTR_CTR != null) {
-        ConstructorConstructor constructorConstructor = (ConstructorConstructor) CTR_CTR.invoke(
-            gson);
-        if (annotation != null) {
-          adapter = getTypeAdapter(constructorConstructor, gson, fieldType, annotation);
+    static {
+        try {
+            MethodHandles.Lookup lookup = privateLookupIn(Gson.class);
+            CTR_CTR = lookup
+                .findGetter(Gson.class, "constructorConstructor", ConstructorConstructor.class);
+        } catch (Throwable t) {
+            // This is used to implement a key feature, it's bad to ignore if this field does not exist
+            // Some message to the user would probably be better,but for now it's fine
+            throw new RuntimeException(t);
         }
-      }
-      if (adapter == null) {
-        adapter = gson.getAdapter(fieldType);
-      }
-
-      adapter = new TrackingTypeAdapter<>(adapter);
-
-      BoundField field = new BoundField(value.key(), adapter);
-      fieldsMap.put(value.key(), field);
     }
 
-    return new TypeAdapter<T>() {
-      @Override
-      public void write(JsonWriter out, T value) throws IOException {
-        out.beginObject();
-        Map<String, Object> map = MapProxy.getInternalMap(value);
-        for (BoundField boundField : fieldsMap.values()) {
-          out.name(boundField.name);
-          Object fieldValue = map.get(boundField.name);
-          boundField.adapter().write(out, fieldValue);
-        }
-        out.endObject();
-      }
-
-      @SneakyThrows
-      @Override
-      public T read(JsonReader in) {
-        in.beginObject();
-        T proxy = (T) createDefault(rawType);
-        Map<String, Object> map = MapProxy.getInternalMap(proxy);
-        while (in.hasNext()) {
-          String name = in.nextName();
-          BoundField field = fieldsMap.get(name);
-          if (field == null) {
-            in.skipValue();
-          } else {
-            Object readValue = field.adapter.read(in);
-            map.put(field.name, readValue);
-          }
-        }
-        in.endObject();
-        return proxy;
-      }
-    };
-  }
-
-  private static class BoundField {
-
-    private final @NotNull String name;
-    private final @NotNull TypeAdapter<?> adapter;
-
+    @Override
     @SneakyThrows
-    public BoundField(@NotNull String name, @NotNull TypeAdapter<?> adapter) {
-      this.name = name;
-      this.adapter = adapter;
+    public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
+        Class<?> rawType = type.getRawType();
+        if (!isConfigSpec(rawType)) {
+            return null;
+        }
+        SpecClass impl = Specs.from(rawType);
+        Map<String, BoundField> fieldsMap = new LinkedHashMap<>();
+        for (SpecProperty value : impl.properties().values()) {
+            if (value.isHandledByProxy()) {
+                continue;
+            }
+            Method getter = value.getter();
+            TypeToken<?> fieldType = TypeToken.get(getter.getGenericReturnType());
+
+            TypeAdapter<?> adapter = null;
+            UseTypeAdapter annotation = getter.getAnnotation(UseTypeAdapter.class);
+            if (CTR_CTR != null) {
+                ConstructorConstructor constructorConstructor = (ConstructorConstructor) CTR_CTR.invoke(
+                    gson);
+                if (annotation != null) {
+                    adapter = getTypeAdapter(constructorConstructor, gson, fieldType, annotation);
+                }
+            }
+            if (adapter == null) {
+                adapter = gson.getAdapter(fieldType);
+            }
+
+            adapter = new TrackingTypeAdapter<>(adapter);
+
+            BoundField field = new BoundField(value.key(), adapter);
+            fieldsMap.put(value.key(), field);
+        }
+
+        return new TypeAdapter<T>() {
+            @Override
+            public void write(JsonWriter out, T value) throws IOException {
+                out.beginObject();
+                Map<String, Object> map = MapProxy.getInternalMap(value);
+                for (BoundField boundField : fieldsMap.values()) {
+                    out.name(boundField.name);
+                    Object fieldValue = map.get(boundField.name);
+                    impl.properties().get(boundField.name).getWriteHook()
+                        .forEach(hook -> hook.accept(fieldValue));
+                    boundField.adapter().write(out, fieldValue);
+                }
+                out.endObject();
+            }
+
+            @SneakyThrows
+            @Override
+            public T read(JsonReader in) {
+                in.beginObject();
+                T proxy = (T) createDefault(rawType);
+                Map<String, Object> map = MapProxy.getInternalMap(proxy);
+                while (in.hasNext()) {
+                    String name = in.nextName();
+                    BoundField field = fieldsMap.get(name);
+                    if (field == null) {
+                        in.skipValue();
+                    } else {
+                        Object readValue = field.adapter.read(in);
+                        impl.properties().get(name).getReadHook()
+                            .forEach(hook -> hook.accept(readValue));
+                        map.put(field.name, readValue);
+                    }
+                }
+                in.endObject();
+                return proxy;
+            }
+        };
     }
 
-    public @NotNull <T> TypeAdapter<T> adapter() {
-      return (TypeAdapter<T>) adapter;
-    }
-  }
+    private static class BoundField {
 
-  static TypeAdapter<?> getTypeAdapter(ConstructorConstructor constructorConstructor, Gson gson,
-      TypeToken<?> fieldType, UseTypeAdapter annotation) {
-    Class<?> value = annotation.value();
-    if (TypeAdapter.class.isAssignableFrom(value)) {
-      Class<TypeAdapter<?>> typeAdapter = (Class<TypeAdapter<?>>) value;
-      return constructorConstructor.get(TypeToken.get(typeAdapter)).construct();
-    }
-    if (TypeAdapterFactory.class.isAssignableFrom(value)) {
-      Class<TypeAdapterFactory> typeAdapterFactory = (Class<TypeAdapterFactory>) value;
-      return constructorConstructor.get(TypeToken.get(typeAdapterFactory))
-          .construct()
-          .create(gson, fieldType);
+        private final @NotNull String name;
+        private final @NotNull TypeAdapter<?> adapter;
+
+        @SneakyThrows
+        public BoundField(@NotNull String name, @NotNull TypeAdapter<?> adapter) {
+            this.name = name;
+            this.adapter = adapter;
+        }
+
+        public @NotNull <T> TypeAdapter<T> adapter() {
+            return (TypeAdapter<T>) adapter;
+        }
     }
 
-    throw new IllegalArgumentException(
-        "@JsonAdapter value must be TypeAdapter or TypeAdapterFactory reference.");
-  }
+    static TypeAdapter<?> getTypeAdapter(ConstructorConstructor constructorConstructor, Gson gson,
+        TypeToken<?> fieldType, UseTypeAdapter annotation) {
+        Class<?> value = annotation.value();
+        if (TypeAdapter.class.isAssignableFrom(value)) {
+            Class<TypeAdapter<?>> typeAdapter = (Class<TypeAdapter<?>>) value;
+            return constructorConstructor.get(TypeToken.get(typeAdapter)).construct();
+        }
+        if (TypeAdapterFactory.class.isAssignableFrom(value)) {
+            Class<TypeAdapterFactory> typeAdapterFactory = (Class<TypeAdapterFactory>) value;
+            return constructorConstructor.get(TypeToken.get(typeAdapterFactory))
+                .construct()
+                .create(gson, fieldType);
+        }
 
-  private static final class TrackingTypeAdapter<T> extends TypeAdapter<T>{
-
-    private final TypeAdapter<T> delegate;
-
-    private TrackingTypeAdapter(TypeAdapter<T> delegate) {
-      this.delegate = delegate;
+        throw new IllegalArgumentException(
+            "@JsonAdapter value must be TypeAdapter or TypeAdapterFactory reference.");
     }
 
-    @Override
-    public void write(JsonWriter out, T value) throws IOException {
-      try {
-        delegate.write(out, value);
-      } catch (SpecSerializationException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new SpecSerializationException(Collections.singletonList(value), e);
-      }
-    }
+    private static final class TrackingTypeAdapter<T> extends TypeAdapter<T> {
 
-    @Override
-    public T read(JsonReader in) throws IOException {
-      try {
-        return delegate.read(in);
-      } catch (SpecSerializationException e) {
-        throw e;
-      } catch (Exception e) {
-        throw new SpecSerializationException(Util.JsonPathUtils.getJsonPath(in), e);
-      }
+        private final TypeAdapter<T> delegate;
+
+        private TrackingTypeAdapter(TypeAdapter<T> delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public void write(JsonWriter out, T value) throws IOException {
+            try {
+                delegate.write(out, value);
+            } catch (SpecSerializationException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new SpecSerializationException(Collections.singletonList(value), e);
+            }
+        }
+
+        @Override
+        public T read(JsonReader in) throws IOException {
+            try {
+                return delegate.read(in);
+            } catch (SpecSerializationException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new SpecSerializationException(Util.JsonPathUtils.getJsonPath(in), e);
+            }
+        }
     }
-  }
 }

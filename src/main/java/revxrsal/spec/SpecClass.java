@@ -23,6 +23,7 @@
  */
 package revxrsal.spec;
 
+import java.util.concurrent.CopyOnWriteArraySet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
@@ -36,6 +37,8 @@ import static revxrsal.spec.SpecProperty.propertiesOf;
 public final class SpecClass {
 
     public static final String ARRAY_INDEX = "<arr>";
+
+    static final Set<PostProcessor> postProcessors = new CopyOnWriteArraySet<>();
 
     private final Class<?> type;
     private final @Unmodifiable Map<String, SpecProperty> properties;
@@ -125,6 +128,18 @@ public final class SpecClass {
             throw new IllegalArgumentException("Interface does not have @ConfigSpec on it!");
         List<String> headers = headerOf(type);
         Map<String, SpecProperty> properties = propertiesOf(type);
+
+        for (SpecProperty property : properties.values()) {
+            for (PostProcessor postProcessor : postProcessors) {
+                var readHook = postProcessor.createReadHook(property);
+                var writeHook = postProcessor.createWriteHook(property);
+                if (readHook != null)
+                    property.getReadHook().add(readHook);
+                if (writeHook != null)
+                    property.getWriteHook().add(writeHook);
+            }
+        }
+
         return new SpecClass(type, properties, headers);
     }
 
