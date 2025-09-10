@@ -27,11 +27,11 @@ public class RangeHook implements PostProcessor {
             }
             double n = ((Number) value).doubleValue();
             Range range = property.getter().getAnnotation(Range.class);
-            if (range.min() < n) {
+            if (range.min() > n) {
                 throw new RuntimeException(
                     String.format("Value is too small: '%f' against '%f' required!", n,
                         range.min()));
-            } else if (range.max() > n) {
+            } else if (range.max() < n) {
                 throw new RuntimeException(
                     String.format("Value is too big: '%f' against '%f' required!", n, range.max()));
             }
