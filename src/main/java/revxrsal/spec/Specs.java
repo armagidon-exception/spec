@@ -86,7 +86,7 @@ public final class Specs {
      * @return The newly created config spec.
      */
     public static @NotNull <T> T fromFile(@NotNull Class<T> type, @NotNull Path config) {
-        return reference(type, CommentedConfiguration.from(config)).get();
+        return reference(type, CommentedConfiguration.from(DataSocket.fromPath(config))).get();
     }
 
     /**
@@ -98,7 +98,7 @@ public final class Specs {
      * @return The newly created config spec.
      */
     public static @NotNull <T> T fromFile(@NotNull Class<T> type, @NotNull File config) {
-        return reference(type, CommentedConfiguration.from(config.toPath())).get();
+        return reference(type, CommentedConfiguration.from(DataSocket.fromPath(config.toPath()))).get();
     }
 
     /**

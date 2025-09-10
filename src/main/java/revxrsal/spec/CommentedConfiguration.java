@@ -93,9 +93,9 @@ public class CommentedConfiguration {
     protected final Gson gson;
 
     /**
-     * Path to the configuration file.
+     * Path to the configuration socket.
      */
-    protected final Path file;
+    protected final DataSocket socket;
 
     /**
      * The JSON representation of the configuration data.
@@ -107,15 +107,15 @@ public class CommentedConfiguration {
      */
     protected final ArrayCommentStyle arrayCommentStyle;
 
-    public CommentedConfiguration(Path file, Gson gson, ArrayCommentStyle arrayCommentStyle, Yaml yaml) {
-        this.file = file;
+    public CommentedConfiguration(DataSocket socket, Gson gson, ArrayCommentStyle arrayCommentStyle, Yaml yaml) {
+        this.socket = socket;
         this.gson = gson;
         this.arrayCommentStyle = arrayCommentStyle;
         this.yaml = yaml;
     }
 
-    public CommentedConfiguration(Path file, Gson gson, ArrayCommentStyle arrayCommentStyle) {
-        this(file, gson, arrayCommentStyle, YAML.get());
+    public CommentedConfiguration(DataSocket socket, Gson gson, ArrayCommentStyle arrayCommentStyle) {
+        this(socket, gson, arrayCommentStyle, YAML.get());
     }
 
     /**
@@ -123,11 +123,7 @@ public class CommentedConfiguration {
      */
     @SneakyThrows
     public void load() {
-        if (!Files.exists(file)) {
-            data = new LinkedHashMap<>();
-            return;
-        }
-        try (BufferedReader reader = Files.newBufferedReader(file)) {
+        try (BufferedReader reader = new BufferedReader(socket.openReader())) {
             data = yaml.load(reader);
             if (data == null)
                 data = new LinkedHashMap<>();
@@ -161,7 +157,7 @@ public class CommentedConfiguration {
     @SneakyThrows
     public void save() {
         if (configComments.isEmpty()) {
-            try (BufferedWriter writer = Files.newBufferedWriter(file, CREATE, TRUNCATE_EXISTING, WRITE)) {
+            try (BufferedWriter writer = new BufferedWriter(socket.openWriter())) {
                 yaml.dump(data, writer);
             }
             return;
@@ -189,67 +185,66 @@ public class CommentedConfiguration {
         if (!headers.isEmpty()) {
             lines.add(headers.size(), "");
         }
-        if (file.getParent() != null)
-            Files.createDirectories(file.getParent());
-        Files.write(file, lines, CREATE, TRUNCATE_EXISTING, WRITE);
+
+        socket.writeStrings(lines);
     }
 
     /**
-     * Create a config from a file
+     * Create a config from a socket
      *
-     * @param file              The file to load the config from.
+     * @param socket              The socket to load the config from.
      * @param json              The JSON instance to deserialize with
      * @param arrayCommentStyle The array commenting style. See {@link ArrayCommentStyle}.
      * @return A new instance of CommentedConfiguration
      */
     public static @NotNull CommentedConfiguration from(
-            @NotNull Path file,
+            @NotNull DataSocket socket,
             @NotNull Gson json,
             @NotNull ArrayCommentStyle arrayCommentStyle
     ) {
         //Creating a blank instance of the config.
-        return new CommentedConfiguration(file, json, arrayCommentStyle);
+        return new CommentedConfiguration(socket, json, arrayCommentStyle);
     }
 
     /**
-     * Create a config from a file
+     * Create a config from a socket
      *
-     * @param file              The file to load the config from.
+     * @param socket              The socket to load the config from.
      * @param arrayCommentStyle The array commenting style. See {@link ArrayCommentStyle}.
      * @return A new instance of CommentedConfiguration
      */
     public static @NotNull CommentedConfiguration from(
-            @NotNull Path file,
+            @NotNull DataSocket socket,
             @NotNull ArrayCommentStyle arrayCommentStyle
     ) {
         //Creating a blank instance of the config.
-        return new CommentedConfiguration(file, GSON, arrayCommentStyle);
+        return new CommentedConfiguration(socket, GSON, arrayCommentStyle);
     }
 
     /**
-     * Create a config from a file
+     * Create a config from a socket
      *
-     * @param file The file to load the config from.
+     * @param socket The socket to load the config from.
      * @param gson The JSON instance to deserialize with
      * @return A new instance of CommentedConfiguration
      */
     public static @NotNull CommentedConfiguration from(
-            @NotNull Path file,
+            @NotNull DataSocket socket,
             @NotNull Gson gson
     ) {
         //Creating a blank instance of the config.
-        return new CommentedConfiguration(file, gson, ArrayCommentStyle.COMMENT_FIRST_ELEMENT);
+        return new CommentedConfiguration(socket, gson, ArrayCommentStyle.COMMENT_FIRST_ELEMENT);
     }
 
     /**
-     * Create a config from a file
+     * Create a config from a socket
      *
-     * @param file The file to load the config from.
+     * @param socket The socket to load the config from.
      * @return A new instance of CommentedConfiguration
      */
-    public static @NotNull CommentedConfiguration from(@NotNull Path file) {
+    public static @NotNull CommentedConfiguration from(@NotNull DataSocket socket) {
         //Creating a blank instance of the config.
-        return from(file, GSON);
+        return from(socket, GSON);
     }
 
     /**
