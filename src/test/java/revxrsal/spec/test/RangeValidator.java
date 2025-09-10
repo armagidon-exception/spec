@@ -1,23 +1,14 @@
 package revxrsal.spec.test;
 
 import java.util.function.Consumer;
-import org.jetbrains.annotations.Nullable;
-import revxrsal.spec.PostProcessor;
 import revxrsal.spec.SpecProperty;
+import revxrsal.spec.validation.PropertyValidator;
+import revxrsal.spec.validation.SpecValidationException;
 
-public class RangeHook implements PostProcessor {
-
-    @Override
-    public @Nullable Consumer<Object> createReadHook(SpecProperty property) {
-        return makeHook(property);
-    }
+public class RangeValidator implements PropertyValidator {
 
     @Override
-    public @Nullable Consumer<Object> createWriteHook(SpecProperty property) {
-        return makeHook(property);
-    }
-
-    private Consumer<Object> makeHook(SpecProperty property) {
+    public Consumer<Object> createValidator(SpecProperty property) {
         return value -> {
             if (!(value instanceof Number)) {
                 return;
@@ -28,11 +19,11 @@ public class RangeHook implements PostProcessor {
             double n = ((Number) value).doubleValue();
             Range range = property.getter().getAnnotation(Range.class);
             if (range.min() > n) {
-                throw new RuntimeException(
+                throw new SpecValidationException(
                     String.format("Value is too small: '%f' against '%f' required!", n,
                         range.min()));
             } else if (range.max() < n) {
-                throw new RuntimeException(
+                throw new SpecValidationException(
                     String.format("Value is too big: '%f' against '%f' required!", n, range.max()));
             }
         };

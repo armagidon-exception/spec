@@ -8,7 +8,7 @@ import java.io.File;
 public class Example {
 
     public static void main(String[] args) {
-        PostProcessorHook.injectPostProcessor(new RangeHook());
+        PostProcessorHook.injectPostProcessor(new RangeValidator());
         ServerConfig config = Specs.fromFile(ServerConfig.class, new File("server.yml"));
         System.out.println(config);
         config.save();
