@@ -99,7 +99,7 @@ public final class SpecAdapterFactory implements TypeAdapterFactory {
             fieldsMap.put(value.key(), field);
         }
 
-        return new TypeAdapter<T>() {
+        return new TrackingTypeAdapter<>(new TypeAdapter<T>() {
             @Override
             public void write(JsonWriter out, T value) throws IOException {
                 out.beginObject();
@@ -135,7 +135,7 @@ public final class SpecAdapterFactory implements TypeAdapterFactory {
                 in.endObject();
                 return proxy;
             }
-        };
+        });
     }
 
     private static class BoundField {
