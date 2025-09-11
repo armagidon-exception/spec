@@ -24,6 +24,7 @@
 package revxrsal.spec;
 
 import static revxrsal.spec.MHLookup.privateLookupIn;
+import static revxrsal.spec.SpecProperty.fieldName;
 import static revxrsal.spec.Specs.createDefault;
 import static revxrsal.spec.Specs.isConfigSpec;
 
@@ -41,6 +42,7 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
 import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -96,7 +98,7 @@ public final class SpecAdapterFactory implements TypeAdapterFactory {
             adapter = new TrackingTypeAdapter<>(adapter);
 
             BoundField field = new BoundField(value.key(), adapter);
-            fieldsMap.put(value.key(), field);
+            fieldsMap.put(fieldName(value), field);
         }
 
         return new TrackingTypeAdapter<>(new TypeAdapter<T>() {
@@ -104,12 +106,12 @@ public final class SpecAdapterFactory implements TypeAdapterFactory {
             public void write(JsonWriter out, T value) throws IOException {
                 out.beginObject();
                 Map<String, Object> map = MapProxy.getInternalMap(value);
-                for (BoundField boundField : fieldsMap.values()) {
-                    out.name(boundField.name);
-                    Object fieldValue = map.get(boundField.name);
-                    impl.properties().get(boundField.name).getWriteHook()
+                for (Entry<String, BoundField> entry : fieldsMap.entrySet()) {
+                    out.name(entry.getKey());
+                    Object fieldValue = map.get(entry.getValue().key);
+                    impl.properties().get(entry.getValue().key).getWriteHook()
                         .forEach(hook -> hook.accept(fieldValue));
-                    boundField.adapter().write(out, fieldValue);
+                    entry.getValue().adapter().write(out, fieldValue);
                 }
                 out.endObject();
             }
@@ -127,9 +129,9 @@ public final class SpecAdapterFactory implements TypeAdapterFactory {
                         in.skipValue();
                     } else {
                         Object readValue = field.adapter.read(in);
-                        impl.properties().get(name).getReadHook()
+                        impl.properties().get(field.key).getReadHook()
                             .forEach(hook -> hook.accept(readValue));
-                        map.put(field.name, readValue);
+                        map.put(field.key, readValue);
                     }
                 }
                 in.endObject();
@@ -140,12 +142,12 @@ public final class SpecAdapterFactory implements TypeAdapterFactory {
 
     private static class BoundField {
 
-        private final @NotNull String name;
+        private final @NotNull String key;
         private final @NotNull TypeAdapter<?> adapter;
 
         @SneakyThrows
-        public BoundField(@NotNull String name, @NotNull TypeAdapter<?> adapter) {
-            this.name = name;
+        public BoundField(@NotNull String key, @NotNull TypeAdapter<?> adapter) {
+            this.key = key;
             this.adapter = adapter;
         }
 

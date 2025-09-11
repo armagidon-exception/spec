@@ -23,7 +23,22 @@
  */
 package revxrsal.spec;
 
+import static java.util.stream.Collectors.toList;
+import static revxrsal.spec.CommentedConfiguration.NEW_LINE;
+
 import com.google.gson.annotations.SerializedName;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import lombok.Getter;
@@ -31,16 +46,12 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
-import revxrsal.spec.annotation.*;
-
-import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.*;
-
-import static java.util.stream.Collectors.toList;
-import static revxrsal.spec.CommentedConfiguration.NEW_LINE;
+import revxrsal.spec.annotation.Comment;
+import revxrsal.spec.annotation.ConfigSpec;
+import revxrsal.spec.annotation.HandledByProxy;
+import revxrsal.spec.annotation.IgnoreMethod;
+import revxrsal.spec.annotation.Key;
+import revxrsal.spec.annotation.Order;
 
 /**
  * Represents a property in a {@link ConfigSpec}
@@ -52,6 +63,12 @@ public final class SpecProperty {
      * The key of the property, set by {@link Key @Key}
      */
     private final @NotNull String key;
+
+    /**
+     * Whether to use name mapper for this property. {@link Key} and {@link SerializedName} must set
+     * this flag to false.
+     */
+    private boolean keyRemap = true;
 
     /**
      * The property type
@@ -74,8 +91,8 @@ public final class SpecProperty {
     private @Unmodifiable List<String> comments = Collections.emptyList();
 
     /**
-     * Tests whether is that property handled by the proxy, and does
-     * not represent an actual property.
+     * Tests whether is that property handled by the proxy, and does not represent an actual
+     * property.
      * <p>
      * See {@link HandledByProxy}
      */
@@ -83,15 +100,13 @@ public final class SpecProperty {
     private boolean isHandledByProxy;
 
     /**
-     * Hooks that work on value read of this property.
-     * Could be used to implement data validators.
+     * Hooks that work on value read of this property. Could be used to implement data validators.
      */
     @Getter
     private final List<Consumer<Object>> readHook = new CopyOnWriteArrayList<>();
 
     /**
-     * Hooks that work on value write of this property.
-     * Could be used to implement data validators.
+     * Hooks that work on value write of this property. Could be used to implement data validators.
      */
     @Getter
     private final List<Consumer<Object>> writeHook = new CopyOnWriteArrayList<>();
@@ -99,8 +114,8 @@ public final class SpecProperty {
     /**
      * The key of the property, set by {@link Key @Key} or {@link SerializedName @SerializedName}.
      * <p>
-     * If none of the given annotations is specified, it will use the field
-     * name (strips is-, get- and set- prefixes)
+     * If none of the given annotations is specified, it will use the field name (strips is-, get-
+     * and set- prefixes)
      *
      * @return The property name
      */
@@ -127,8 +142,7 @@ public final class SpecProperty {
     }
 
     /**
-     * Returns the setter of this property. Could be null if the
-     * property does not define a setter.
+     * Returns the setter of this property. Could be null if the property does not define a setter.
      *
      * @return The property setter
      */
@@ -155,21 +169,24 @@ public final class SpecProperty {
     }
 
     /**
-     * Sets the type of this property. This performs type checks to ensure
-     * the two types do not conflict
+     * Sets the type of this property. This performs type checks to ensure the two types do not
+     * conflict
      *
      * @param type The new type
      */
     private void setType(@Nullable Class<?> type) {
-        if (this.type == null)
+        if (this.type == null) {
             this.type = type;
-        else if (!this.type.equals(type))
-            throw new IllegalArgumentException("Inconsistent types for property " + key + ". Received " + this.type + " and " + type + ".");
+        } else if (!this.type.equals(type)) {
+            throw new IllegalArgumentException(
+                "Inconsistent types for property " + key + ". Received " + this.type + " and "
+                    + type + ".");
+        }
     }
 
     /**
-     * Tests if the method implies a setter or not. This simply
-     * checks if the method name starts with 'set'.
+     * Tests if the method implies a setter or not. This simply checks if the method name starts
+     * with 'set'.
      *
      * @param method The method to check for
      * @return if it implies a setter
@@ -179,19 +196,20 @@ public final class SpecProperty {
     }
 
     /**
-     * Returns the name of the property that is represented
-     * by this method
+     * Returns the name of the property that is represented by this method
      *
      * @param method The method to get for
      * @return The property name
      */
     public static @NotNull String keyOf(@NotNull Method method) {
         Key key = method.getAnnotation(Key.class);
-        if (key != null)
+        if (key != null) {
             return key.value();
+        }
         SerializedName sn = method.getAnnotation(SerializedName.class);
-        if (sn != null)
+        if (sn != null) {
             return sn.value();
+        }
         return fromName(method.getName());
     }
 
@@ -202,10 +220,11 @@ public final class SpecProperty {
      * @return The new name
      */
     private static @NotNull String fromName(@NotNull String name) {
-        if (name.startsWith("get") || name.startsWith("set"))
+        if (name.startsWith("get") || name.startsWith("set")) {
             return lowerFirst(name.substring(3));
-        else if (name.startsWith("is"))
+        } else if (name.startsWith("is")) {
             return lowerFirst(name.substring(2));
+        }
         return name;
     }
 
@@ -216,59 +235,93 @@ public final class SpecProperty {
      * @return The new string
      */
     private static @NotNull String lowerFirst(@NotNull String name) {
-        if (name.isEmpty())
+        if (name.isEmpty()) {
             return name;
+        }
         return Character.toLowerCase(name.charAt(0)) + name.substring(1);
     }
 
-    static @NotNull @Unmodifiable Map<String, SpecProperty> propertiesOf(@NotNull Class<?> interfaceType) {
+    static @NotNull @Unmodifiable Map<String, SpecProperty> propertiesOf(
+        @NotNull Class<?> interfaceType) {
         Objects.requireNonNull(interfaceType, "interface cannot be null!");
-        if (!interfaceType.isInterface())
-            throw new IllegalArgumentException("Class is not an interface: " + interfaceType.getName());
-        if (!interfaceType.isAnnotationPresent(ConfigSpec.class))
+        if (!interfaceType.isInterface()) {
+            throw new IllegalArgumentException(
+                "Class is not an interface: " + interfaceType.getName());
+        }
+        if (!interfaceType.isAnnotationPresent(ConfigSpec.class)) {
             throw new IllegalArgumentException("Interface does not have @ConfigSpec on it!");
+        }
         Map<String, SpecProperty> properties = new LinkedHashMap<>();
         Method[] methods = interfaceType.getMethods();
 
         sortByAnnotation(methods);
         for (Method method : methods) {
-            if (Modifier.isStatic(method.getModifiers()))
+            if (Modifier.isStatic(method.getModifiers())) {
                 continue;
+            }
             if (method.isAnnotationPresent(IgnoreMethod.class)) {
-                if (method.isDefault())
+                if (method.isDefault()) {
                     continue;
-                else
-                    throw new IllegalArgumentException("Cannot ignore a non-default method! Ignored methods must be default");
+                } else {
+                    throw new IllegalArgumentException(
+                        "Cannot ignore a non-default method! Ignored methods must be default");
+                }
             }
             parse(method, properties);
         }
         for (SpecProperty value : properties.values()) {
-            if (value.type == null)
-                throw new IllegalArgumentException("Failed to infer the type of property '" + value.key + "'!");
-            if (value.getter == null)
-                throw new IllegalArgumentException("No getter exists for property '" + value.key + "'!");
+            if (value.type == null) {
+                throw new IllegalArgumentException(
+                    "Failed to infer the type of property '" + value.key + "'!");
+            }
+            if (value.getter == null) {
+                throw new IllegalArgumentException(
+                    "No getter exists for property '" + value.key + "'!");
+            }
         }
+
+        Map<String, List<SpecProperty>> fieldNames = new HashMap<>();
+        for (SpecProperty value : properties.values()) {
+            fieldNames.computeIfAbsent(fieldName(value), ignored -> new ArrayList<>())
+                .add(value);
+        }
+
+        for (List<SpecProperty> occurrences : fieldNames.values()) {
+            if (occurrences.size() > 1) {
+                throw new IllegalArgumentException(
+                    String.format("Property '%s' and '%s' have the same field name.",
+                        occurrences.get(0), occurrences.get(1)));
+            }
+        }
+
         return Collections.unmodifiableMap(properties);
+    }
+
+    static String fieldName(SpecProperty p) {
+        return p.keyRemap ? NameMapper.camelToKebab(p.key()) : p.key();
     }
 
     private static <T extends AnnotatedElement> void sortByAnnotation(T[] methods) {
         Arrays.sort(methods, (o1, o2) -> {
             Order order1 = o1.getAnnotation(Order.class);
             Order order2 = o2.getAnnotation(Order.class);
-            if (order1 == null && order2 == null)
+            if (order1 == null && order2 == null) {
                 return 0; // Both methods are unannotated
-            if (order1 == null)
+            }
+            if (order1 == null) {
                 return -1; // o1 is unannotated, so it comes first
-            if (order2 == null)
+            }
+            if (order2 == null) {
                 return 1;  // o2 is unannotated, so it comes first
+            }
             // Both methods have the annotation, compare their values
             return Integer.compare(order1.value(), order2.value());
         });
     }
 
     private static void parse(
-            @NotNull Method method,
-            @NotNull Map<String, SpecProperty> properties
+        @NotNull Method method,
+        @NotNull Map<String, SpecProperty> properties
     ) {
         String key = keyOf(method);
         SpecProperty existing = properties.computeIfAbsent(key, SpecProperty::new);
@@ -279,28 +332,44 @@ public final class SpecProperty {
             existing.setType(method.getReturnType());
             return;
         }
+        if (method.isAnnotationPresent(Key.class) || method.isAnnotationPresent(
+            SerializedName.class)) {
+            existing.keyRemap = false;
+        }
         if (comments != null) {
-            if (existing.comments.isEmpty())
+            if (existing.comments.isEmpty()) {
                 existing.comments = comments;
-            else
-                throw new IllegalArgumentException("Inconsistent comments for property '" + key + "'");
+            } else {
+                throw new IllegalArgumentException(
+                    "Inconsistent comments for property '" + key + "'");
+            }
         }
         if (method.getReturnType() == Void.TYPE || impliesSetter(method)) {
-            if (existing.setter != null)
+            if (existing.setter != null) {
                 throw new IllegalArgumentException("Found 2 setters for property '" + key + "'!");
-            if (method.getReturnType() != Void.TYPE)
-                throw new IllegalArgumentException("Setter for property '" + key + "' must return void!");
-            if (method.getParameterCount() == 0)
-                throw new IllegalArgumentException("Setter for property '" + key + "' has no parameters!");
-            if (method.getParameterCount() > 1)
-                throw new IllegalArgumentException("Setter for property '" + key + "' has more than 1 parameter!");
+            }
+            if (method.getReturnType() != Void.TYPE) {
+                throw new IllegalArgumentException(
+                    "Setter for property '" + key + "' must return void!");
+            }
+            if (method.getParameterCount() == 0) {
+                throw new IllegalArgumentException(
+                    "Setter for property '" + key + "' has no parameters!");
+            }
+            if (method.getParameterCount() > 1) {
+                throw new IllegalArgumentException(
+                    "Setter for property '" + key + "' has more than 1 parameter!");
+            }
             existing.setType(method.getParameterTypes()[0]);
             existing.setter = method;
         } else {
-            if (existing.getter != null)
+            if (existing.getter != null) {
                 throw new IllegalArgumentException("Found 2 getters for property '" + key + "'!");
-            if (method.getParameterCount() != 0)
-                throw new IllegalArgumentException("Getter for property '" + key + "' cannot take parameters!");
+            }
+            if (method.getParameterCount() != 0) {
+                throw new IllegalArgumentException(
+                    "Getter for property '" + key + "' cannot take parameters!");
+            }
             existing.setType(method.getReturnType());
             existing.getter = method;
         }
@@ -315,8 +384,8 @@ public final class SpecProperty {
         if (comment != null) {
             String[] value = comment.value();
             return Arrays.stream(value)
-                    .flatMap(NEW_LINE::splitAsStream)
-                    .collect(toList());
+                .flatMap(NEW_LINE::splitAsStream)
+                .collect(toList());
         }
         return null;
     }
@@ -326,8 +395,8 @@ public final class SpecProperty {
         if (spec != null) {
             String[] value = spec.header();
             return Arrays.stream(value)
-                    .flatMap(NEW_LINE::splitAsStream)
-                    .collect(toList());
+                .flatMap(NEW_LINE::splitAsStream)
+                .collect(toList());
         }
         return Collections.emptyList();
     }
