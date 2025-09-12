@@ -29,9 +29,12 @@ import static revxrsal.spec.Specs.createDefault;
 import static revxrsal.spec.Specs.isConfigSpec;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonSerializer;
 import com.google.gson.TypeAdapter;
 import com.google.gson.TypeAdapterFactory;
 import com.google.gson.internal.ConstructorConstructor;
+import com.google.gson.internal.bind.TreeTypeAdapter;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
@@ -169,9 +172,15 @@ public final class SpecAdapterFactory implements TypeAdapterFactory {
                 .construct()
                 .create(gson, fieldType);
         }
+        if (JsonSerializer.class.isAssignableFrom(value) || JsonDeserializer.class.isAssignableFrom(value)) {
+            var typeAdapter = constructorConstructor.get(TypeToken.get(value))
+                .construct();
+            return TreeTypeAdapter.newFactoryWithMatchRawType(fieldType, typeAdapter)
+                .create(gson, fieldType);
+        }
 
         throw new IllegalArgumentException(
-            "@JsonAdapter value must be TypeAdapter or TypeAdapterFactory reference.");
+            "@JsonAdapter value must be TypeAdapter or TypeAdapterFactory reference or either implement JsonSerializer or JsonDeserializer or both.");
     }
 
     private static final class TrackingTypeAdapter<T> extends TypeAdapter<T> {
